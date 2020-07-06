@@ -3,41 +3,43 @@ const assert = require("assert");
 
 const url = "mongodb://localhost:27017/";
 const dbname = "conFusion";
-const dboperations = require("./operations");
+const dboper = require("./operations");
 
-MongoClient.connect(url, (err, client) => {
-  assert.equal(err, null);
+MongoClient.connect(url).then((client) => {
 
-  console.log("Connected correctly to server");
-
+  console.log('Connected correctly to server');
   const db = client.db(dbname);
-  dboperations.insertDocument(db,{name: "Vadonut", description: "Test"},"dishes",result=>
-  {
-    console.log("Insert Document:\n",result.ops);
 
-    dboperations.findDocuments(db,"dishes",(docs)=>
-    {
-      console.log("Found Documents:\n", docs);
+  dboper.insertDocument(db, { name: "Vadonut", description: "Test"},
+      "dishes")
+      .then((result) => {
+          console.log("Insert Document:\n", result.ops);
 
-      dboperations.updateDocument(db,{ name: "Vadonut" },
-      { description: "Updated Test" }, "dishes",(result)=>
-      {
-        console.log("Updated Document:\n", result.result);
-        
-        dboperations.findDocuments(db,"dishes",(docs)=>
-        {
+          return dboper.findDocuments(db, "dishes");
+      })
+      .then((docs) => {
+          console.log("Found Documents:\n", docs);
+
+          return dboper.updateDocument(db, { name: "Vadonut" },
+                  { description: "Updated Test" }, "dishes");
+
+      })
+      .then((result) => {
+          console.log("Updated Document:\n", result.result);
+
+          return dboper.findDocuments(db, "dishes");
+      })
+      .then((docs) => {
           console.log("Found Updated Documents:\n", docs);
+                          
+          return db.dropCollection("dishes");
+      })
+      .then((result) => {
+          console.log("Dropped Collection: ", result);
 
-          db.dropCollection("dishes",(result)=>
-          {
-            console.log("Dropped Collection: ", result);
+          return client.close();
+      })
+      .catch((err) => console.log(err));
 
-            client.close();
-          });
-        })
-      });
-    });
-
-  })
-  
-});
+})
+.catch((err) => console.log(err));
