@@ -1,18 +1,21 @@
-const express = require('express');
-const bodyparse = require('body-parser');
-const mongoose = require('mongoose');
-const Dishes = require('../models/dishes');
+const express = require('express'); //used to create Router
+const bodyparse = require('body-parser'); //this is used to parse the data from a body in req and reponse
+const mongoose = require('mongoose'); //mongoose for connection and all
+const Dishes = require('../models/dishes'); //importing Dish model from dishes.js module
+var authenticate = require('../authenticate'); //this module contains logic for authentication of user using jwt or any other approach
+
+const dishRouter = express.Router(); //creating a router
 
 
-const dishRouter = express.Router();
+dishRouter.use(bodyparse.json()); //use body-parser as a middleware
 
 
-dishRouter.use(bodyparse.json());
+//we are verifying user only when he does the following operations like post put delete beacause these may cause potential threat to the DB
 
 //  this is for dishes as a whole
 dishRouter.route('/')
 .get((req,res,next) => {
-    Dishes.find({}).then((dishes)=>
+    Dishes.find({}).populate('comments.author').then((dishes)=>
     {
         res.statusCode=200;
         res.setHeader('Content-Type','application/json');
@@ -23,7 +26,7 @@ dishRouter.route('/')
             next(err);
         })
 })
-.post((req, res, next) => {
+.post(authenticate.verifyUser,(req, res, next) => {   //this is like saying u need to request only when you are verified or authenticated using verifyUser function 
     Dishes.create(req.body).then((dish)=>
     {
         console.log('Dish Created ', dish);
@@ -32,12 +35,12 @@ dishRouter.route('/')
         res.json(dish);
     },err=> next(err)).catch((err=>next(err)));
 })
-.put((req, res, next) => {
+.put(authenticate.verifyUser,(req, res, next) => {
     res.statusCode = 403;
     res.send('PUT operation not supported on /dishes');
     
 })
-.delete((req, res, next) => {
+.delete(authenticate.verifyUser,(req, res, next) => {
    Dishes.remove({}).then((resp)=>
    {
     res.statusCode = 200;
@@ -52,18 +55,19 @@ dishRouter.route('/')
 // for a particular dish 
 dishRouter.route('/:dishId').get((req,res,next)=>
 {
-   Dishes.findById(req.params.dishId)
+   Dishes.findById(req.params.dishId).populate
+   ('comments.author')
    .then((dish)=>
    {
     res.statusCode = 200;
     res.setHeader('Content-Type', 'application/json');
     res.json(dish);
    },(err)=>next(err)).catch((err)=>next(err));
-}).post((req,res,next)=>
+}).post(authenticate.verifyUser,(req,res,next)=>
 {
     res.statusCode = 403;
     res.end('POST operation not supported on /dishes/'+ req.params.dishId);
-}).put((req,res,next)=>
+}).put(authenticate.verifyUser,(req,res,next)=>
 {
   Dishes.findByIdAndUpdate(req.params.dishId,{
       $set:req.body
@@ -74,7 +78,7 @@ dishRouter.route('/:dishId').get((req,res,next)=>
     res.setHeader('Content-Type', 'application/json');
     res.json(dish);
   },(err)=>next(err)).catch((err)=>next(err));
-}).delete((req,res,next)=>
+}).delete(authenticate.verifyUser,(req,res,next)=>
 {
    Dishes.findByIdAndRemove(req.params.dishId).then((resp)=>
    {
@@ -88,7 +92,7 @@ dishRouter.route('/:dishId').get((req,res,next)=>
 // These are for a specific dish's comments
 dishRouter.route('/:dishId/comments')
 .get((req,res,next) => {
-    Dishes.findById(req.params.dishId).then((dish)=>
+    Dishes.findById(req.params.dishId).populate('comments.author').then((dish)=>
     {
         if(dish!=null)
         {
@@ -108,18 +112,23 @@ dishRouter.route('/:dishId/comments')
             next(err);
         })
 })
-.post((req, res, next) => {
+.post(authenticate.verifyUser,(req, res, next) => {
      
  Dishes.findById(req.params.dishId).then((dish)=>
     {
         if(dish!=null)
         {
+            req.body.author= req.user._id;
             dish.comments.push(req.body);
             dish.save().then(dish=>
                 {
-                    res.statusCode=200;
-                    res.setHeader('Content-Type','application/json');
-                    res.json(dish);
+                    Dishes.findById(dish._id)
+                    .populate('comments.author').then((dish)=>
+                    {
+                        res.statusCode=200;
+                        res.setHeader('Content-Type','application/json');
+                        res.json(dish);
+                    })
                 },err=>next(err));
         }
         else
@@ -134,13 +143,13 @@ dishRouter.route('/:dishId/comments')
             next(err);
         })
 })
-.put((req, res, next) => {
+.put(authenticate.verifyUser,(req, res, next) => {
     res.statusCode = 403;
     res.end('PUT operation not supported on /dishes/'
         + req.params.dishId + '/comments');
     
 })
-.delete((req, res, next) => {
+.delete(authenticate.verifyUser,(req, res, next) => {
     Dishes.findById(req.params.dishId).then((dish)=>
     {
         if(dish!=null)
@@ -174,7 +183,7 @@ dishRouter.route('/:dishId/comments')
 // operations on a dish's comment's details  
 dishRouter.route('/:dishId/comments/:commentId').get((req,res,next)=>
 {
-   Dishes.findById(req.params.dishId)
+   Dishes.findById(req.params.dishId).populate('comments.author')
    .then((dish)=>
    {
     if (dish != null && dish.comments.id(req.params.commentId) != null) {
@@ -193,13 +202,14 @@ dishRouter.route('/:dishId/comments/:commentId').get((req,res,next)=>
         return next(err);            
     }
    },(err)=>next(err)).catch((err)=>next(err));
-}).post((req,res,next)=>
+}).post(authenticate.verifyUser,(req,res,next)=>
 {
     res.statusCode = 403;
     res.end('POST operation not supported on /dishes/'+ req.params.dishId
         + '/comments/' + req.params.commentId);
-}).put((req,res,next)=>
+}).put(authenticate.verifyUser,(req,res,next)=>
 {
+
     Dishes.findById(req.params.dishId)
     .then((dish) => {
         if (dish != null && dish.comments.id(req.params.commentId) != null) {
@@ -211,9 +221,14 @@ dishRouter.route('/:dishId/comments/:commentId').get((req,res,next)=>
             }
             dish.save()
             .then((dish) => {
-                res.statusCode = 200;
-                res.setHeader('Content-Type', 'application/json');
-                res.json(dish);                
+                Dishes.findById(dish._id).populate('comments.author')
+                .then((dish)=>
+                {
+                    res.statusCode = 200;
+                    res.setHeader('Content-Type', 'application/json');
+                    res.json(dish);   
+                })
+                            
             }, (err) => next(err));
         }
         else if (dish == null) {
@@ -228,7 +243,7 @@ dishRouter.route('/:dishId/comments/:commentId').get((req,res,next)=>
         }
     }, (err) => next(err))
     .catch((err) => next(err));
-}).delete((req,res,next)=>
+}).delete(authenticate.verifyUser,(req,res,next)=>
 {
     Dishes.findById(req.params.dishId)
     .then((dish) => {
@@ -236,9 +251,12 @@ dishRouter.route('/:dishId/comments/:commentId').get((req,res,next)=>
             dish.comments.id(req.params.commentId).remove();
             dish.save()
             .then((dish) => {
+               Dishes.findById(dish._id).then((dish)=>
+               {
                 res.statusCode = 200;
                 res.setHeader('Content-Type', 'application/json');
-                res.json(dish);                
+                res.json(dish);
+               })           
             }, (err) => next(err));
         }
         else if (dish == null) {

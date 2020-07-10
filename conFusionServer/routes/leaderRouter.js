@@ -1,11 +1,20 @@
-const express = require("express");
-const bodyparser = require("body-parser");
+const express = require("express"); //importing express to create Ruter
+const bodyparser = require("body-parser"); //to parse the body of req and resp
 
-const leaderRouter = express.Router();
+const leaderRouter = express.Router(); //iniialize the router
 
-leaderRouter.use(bodyparser.json());
+leaderRouter.use(bodyparser.json()); //use body parser middleware
 
-const Leaders = require("../models/leaders");
+const Leaders = require("../models/leaders"); //importing the Leaders Model
+
+var authenticate = require('../authenticate'); //for authentication of user using jwt or any other approach
+
+
+//we are verifying user only when he does the following operations like post put delete beacause these may cause potential threat to the DB
+
+
+
+
 leaderRouter
   .route("/")
   .get((req, res, next) => {
@@ -22,7 +31,7 @@ leaderRouter
       )
       .catch((err) => next(err));
   })
-  .post((req, res, next) => {
+  .post(authenticate.verifyUser,(req, res, next) => { ///this is like saying u need to request only when you are verified or authenticated using verifyUser function 
     Leaders.create(req.body)
       .then(
         (leader) => {
@@ -39,11 +48,11 @@ leaderRouter
         next(err);
       });
   })
-  .put((req, res, next) => {
+  .put(authenticate.verifyUser,(req, res, next) => {
     res.statusCode = 403;
     res.send("PUT operation not supported on /leaders");
   })
-  .delete((req, res, next) => {
+  .delete(authenticate.verifyUser,(req, res, next) => {
     Leaders.remove({})
       .then(
         (resp) => {
@@ -72,11 +81,11 @@ leaderRouter
       )
       .catch((err) => next(err));
   })
-  .post((req, res, next) => {
+  .post(authenticate.verifyUser,(req, res, next) => {
     res.statusCode = 403;
     res.end("POST operation not supported on /leaders/" + req.params.leaderId);
   })
-  .put((req, res, next) => {
+  .put(authenticate.verifyUser,(req, res, next) => {
     Leaders.findByIdAndUpdate(
       req.params.leaderId,
       {
@@ -96,7 +105,7 @@ leaderRouter
       )
       .catch((err) => next(err));
   })
-  .delete((req, res, next) => {
+  .delete(authenticate.verifyUser,(req, res, next) => {
     Leaders.findByIdAndRemove(req.params.leaderId)
       .then(
         (resp) => {

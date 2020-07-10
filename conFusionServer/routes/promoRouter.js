@@ -1,10 +1,18 @@
-const bodyparser = require("body-parser");
-const express = require("express");
+const bodyparser = require("body-parser"); //body parserfor parsing the req and res of body
+const express = require("express"); //for Router
 
-const promoRouter = express.Router();
+const promoRouter = express.Router(); //initialize ROuter
 
-promoRouter.use(bodyparser.json());
-const Promotions = require("../models/promotions");
+promoRouter.use(bodyparser.json()); //user body parser middle ware
+const Promotions = require("../models/promotions");    //Promotions module for DB Operations 
+var authenticate = require('../authenticate');         //used to authenticate using jwt 
+
+
+
+//we are verifying user only when he does the following operations like post put delete beacause these may cause potential threat to the DB
+
+
+
 
 promoRouter
   .route("/")
@@ -22,7 +30,7 @@ promoRouter
         next(err);
       });
   })
-  .post((req, res, next) => {
+  .post(authenticate.verifyUser,(req, res, next) => {  //this is like saying u need to request only when you are verified or authenticated using verifyUser function 
     Promotions.create(req.body)
       .then(
         (promotion) => {
@@ -37,11 +45,11 @@ promoRouter
       )
       .catch((err) => next(err));
   })
-  .put((req, res, next) => {
+  .put(authenticate.verifyUser,(req, res, next) => {
     res.statusCode = 403;
     res.send("PUT operation not supported on /promotions");
   })
-  .delete((req, res, next) => {
+  .delete(authenticate.verifyUser,(req, res, next) => {
     Promotions.remove({})
       .then(
         (resp) => {
@@ -68,13 +76,13 @@ promoRouter
       )
       .catch((err) => next(err));
   })
-  .post((req, res, next) => {
+  .post(authenticate.verifyUser,(req, res, next) => {
     res.statusCode = 403;
     res.end(
       "POST operation not supported on /promotions/" + req.params.promoId
     );
   })
-  .put((req, res, next) => {
+  .put(authenticate.verifyUser,(req, res, next) => {
     Promotions.findByIdAndUpdate(
       req.params.promoId,
       {
@@ -92,7 +100,7 @@ promoRouter
       )
       .catch((err) => next(err));
   })
-  .delete((req, res, next) => {
+  .delete(authenticate.verifyUser,(req, res, next) => {
     Promotions.findByIdAndRemove(req.params.promoId)
       .then(
         (resp) => {
